@@ -1,0 +1,53 @@
+{
+  "crawler": {
+    "thread": 4,
+    "outputFilePath": "/Users/hooy/Project/webmagic-job/out",
+    "multi": false,
+    "proxy": {
+      "hostPort": "localhost:7890",
+      "username": "hooyantsing",
+      "password": "hooyantsing"
+    }
+  },
+  "startUrl": [
+    {
+      "url": "https://www.hnit.edu.cn/xww/zhxw/${pageNum}.htm",
+      "title": "湖南工学院-校讯",
+      "limit": 10
+    }
+  ],
+  "resolve": {
+    "constant": {
+      "siteId": "10010",
+      "siteName": "湖南工学院"
+    },
+    "templates": [
+      {
+        "urlRex": "https://www\\.hnit\\.edu\\.cn/xww/zhxw/\\d+\\.htm",
+        "config": {
+          "outputFileName": "hnit-rank.txt",
+          "innerUrlAppend": "https://www.hnit.edu.cn/xww/${innerUrl}"
+        },
+        "process": {
+          "title": "/html/body/div/div/div[2]/div[1]/div[1]/a[1]",
+          "items": {
+            "item": "//div[@class='newsContent']/ul/li",
+            "innerUrl": "//a/@href",
+            "contName": "//a/text()",
+            "rankTime": "//span/text()"
+          }
+        }
+      },
+      {
+        "urlRex": "https://www\\.hnit\\.edu\\.cn/info/1343/\\d+\\.htm",
+        "config": {
+          "outputFileName": "hnit-detail.txt"
+        },
+        "process": {
+          "contName": "/html/body/div/div/div[2]/div[1]/form/h2",
+          "detailTime": "/html/body/div/div/div[2]/div[1]/form/span/text()"
+        }
+      }
+    ]
+  }
+}
