@@ -9,10 +9,12 @@ import us.codecraft.webmagic.ResultItems;
 import us.codecraft.webmagic.Task;
 import us.codecraft.webmagic.handler.PatternProcessor;
 import xyz.hooy.wj.executor.business.listdetail.model.ListDetailTask;
+import xyz.hooy.wj.executor.constant.Placeholder;
 import xyz.hooy.wj.executor.downloader.ExtendedPage;
 import xyz.hooy.wj.executor.selector.Selector;
 import xyz.hooy.wj.executor.selector.SelectorFactory;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
 
@@ -35,77 +37,95 @@ public class ListDetailPatternProcessor extends PatternProcessor {
     @Override
     public MatchOther processPage(Page p) {
         ExtendedPage page = (ExtendedPage) p;
-        log.info("ListDetailPatternProcessor, url: {}, contentType: {}", page.getUrl().get(), page.getContentType());
-        String rawText = page.getRawText();
-        Selector selector = selectorFactory.get(page.getContentType());
+        final String currentUrl = page.getUrl().get();
+        final String contentType = page.getContentType();
+        final String rawText = page.getRawText();
+        log.info("ListDetailPatternProcessor, url: {}, contentType: {}", currentUrl, contentType);
+        Selector selector = selectorFactory.get(contentType);
+        Request request = page.getRequest();
+        request.putExtra("outputFileName", template.getConfig().getOutputFileName());
         // detail page
+        ListDetailTask.StartUrlDO startDO = request.getExtra("startUrl");
         Map<String, String> detailResult = new LinkedHashMap<>(constant);
-        page.getRequest().getExtras().put("outputFileName", template.getConfig().getOutputFileName());
-        ListDetailTask.StartUrlDO startUrl = page.getRequest().getExtra("startUrl");
-        detailResult.put("listTitle", startUrl.getTitle());
-        detailResult.put("currentUrl", page.getUrl().get());
+        detailResult.put("currentUrl", currentUrl);
+        detailResult.put("listTitle", startDO.getTitle());
         Map<String, Object> detailHooks = template.getProcess();
         for (Map.Entry<String, Object> detailHook : detailHooks.entrySet()) {
-            String hookKey = detailHook.getKey();
-            if (StringUtils.equals(hookKey, "items")) continue;
-            String hookValue = (String) detailHook.getValue();
-            if (StringUtils.isBlank(hookValue)) continue;
-            String value = selector.select(hookValue, rawText);
-            detailResult.put(hookKey, StringUtils.trim(value));
-        }
-        Object isListPage = template.getProcess().get("items");
-        if (Objects.nonNull(isListPage)) {
-            // list page
-            Map<String, String> listHooks = (Map<String, String>) isListPage;
-            String itemHookValue = listHooks.get("item");
-            if (StringUtils.isNotBlank(itemHookValue)) {
-                ListDetailTask.StartUrlDO sudo = page.getRequest().getExtra("startUrl");
-                List<String> itemNodes = selector.selects(itemHookValue, rawText);
-                if (itemNodes.isEmpty()) {
-                    log.info("Not find item, url: {}, path: {}", page.getUrl().get(), itemHookValue);
-                    page.setSkip(true);
-                    return MatchOther.NO;
-                }
-                List<Map<String, String>> listResults = new ArrayList<>(itemNodes.size());
-                for (String itemNode : itemNodes) {
-                    Map<String, String> listResult = new LinkedHashMap<>();
-                    for (Map.Entry<String, String> listHook : listHooks.entrySet()) {
-                        String hookKey = listHook.getKey();
-                        if (StringUtils.equals(hookKey, "item")) continue;
-                        String hookValue = listHook.getValue();
-                        if (StringUtils.isBlank(hookValue)) continue;
-                        String value = selector.select(hookValue, itemNode);
-                        // inner page
-                        if (StringUtils.equals(hookKey, "innerUrl")) {
-                            if (StringUtils.containsAny(value, "./", "../")) {
-                                value = new URL(new URL(page.getUrl().get()), value).toString();
-                            } else {
-                                String innerUrlAppend = template.getConfig().getInnerUrlAppend();
-                                if (StringUtils.isNotBlank(innerUrlAppend)) {
-                                    value = StringUtils.replace(innerUrlAppend, "${innerUrl}", value);
+            String detailHookKey = detailHook.getKey();
+            if (StringUtils.equals(detailHookKey, "items")) {
+                Object detailHookValue = detailHook.getValue();
+                if (detailHookValue != null) {
+                    // list page
+                    Map<String, String> listHooks = (Map<String, String>) detailHookValue;
+                    String itemHookValue = listHooks.get("item");
+                    if (StringUtils.isNotBlank(itemHookValue)) {
+                        List<String> itemNodes = selector.selects(itemHookValue, rawText);
+                        if (itemNodes.isEmpty()) {
+                            log.info("Not find item, url: {}, path: {}", currentUrl, itemHookValue);
+                            page.setSkip(true);
+                            return MatchOther.NO;
+                        }
+                        List<Map<String, String>> listResults = new ArrayList<>(itemNodes.size());
+                        for (String itemNode : itemNodes) {
+                            Map<String, String> listResult = new LinkedHashMap<>(listHooks.size());
+                            for (Map.Entry<String, String> listHook : listHooks.entrySet()) {
+                                String listHookKey = listHook.getKey();
+                                String listHookValue = listHook.getValue();
+                                if (!StringUtils.equals(listHookKey, "item") && StringUtils.isNotBlank(listHookValue)) {
+                                    String value = selector.select(listHookValue, itemNode);
+                                    // inner page
+                                    if (StringUtils.equals(listHookKey, "innerUrl")) {
+                                        value = detectInnerUrl(currentUrl, value);
+                                        Request innerRequest = buildRequest(value, startDO);
+                                        page.addTargetRequest(innerRequest);
+                                    }
+                                    listResult.put(listHookKey, StringUtils.trimToEmpty(value));
                                 }
                             }
-                            page.addTargetRequest(new Request(value).putExtra("startUrl", startUrl));
+                            startDO.completed();
+                            listResult.put("listIndex", String.valueOf(startDO.getIndex()));
+                            listResult.putAll(detailResult);
+                            listResults.add(listResult);
+                            if (startDO.isAllCompleted()) break;
                         }
-                        listResult.put(hookKey, StringUtils.trim(value));
+                        // next page
+                        if (!startDO.isAllCompleted()) {
+                            String nextUrl = startDO.getNextPageUrl();
+                            Request nextRequest = buildRequest(nextUrl, startDO);
+                            page.addTargetRequest(nextRequest);
+                        }
+                        page.putField(UUID.randomUUID().toString(), listResults);
+                        return MatchOther.NO;
                     }
-                    sudo.completed();
-                    listResult.put("listIndex", String.valueOf(startUrl.getIndex()));
-                    listResult.putAll(detailResult);
-                    listResults.add(listResult);
-                    if (sudo.isAllCompleted()) break;
                 }
-                page.putField(UUID.randomUUID().toString(), listResults);
-                // next page
-                if (!sudo.isAllCompleted()) {
-                    Request request = new Request(sudo.getNextPageUrl()).putExtra("startUrl", sudo);
-                    page.addTargetRequest(request);
+            } else {
+                String detailHookValue = (String) detailHook.getValue();
+                if (StringUtils.isNotBlank(detailHookValue)) {
+                    String value = selector.select(detailHookValue, rawText);
+                    detailResult.put(detailHookKey, StringUtils.trimToEmpty(value));
                 }
             }
-        } else {
-            page.putField(UUID.randomUUID().toString(), detailResult);
         }
+        page.putField(UUID.randomUUID().toString(), detailResult);
         return MatchOther.NO;
+    }
+
+    private String detectInnerUrl(String current, String inner) throws MalformedURLException {
+        if (StringUtils.containsAny(inner, "./", "../")) {
+            return new URL(new URL(current), inner).toString();
+        } else {
+            String innerUrlAppend = template.getConfig().getInnerUrlAppend();
+            if (StringUtils.isNotBlank(innerUrlAppend)) {
+                return StringUtils.replace(innerUrlAppend, Placeholder.INNER_URL, inner);
+            }
+        }
+        return inner;
+    }
+
+    private Request buildRequest(String url, ListDetailTask.StartUrlDO startUrl) {
+        Request request = new Request(url);
+        request.putExtra("startUrl", startUrl);
+        return request;
     }
 
     @Override

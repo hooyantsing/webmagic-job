@@ -4,10 +4,10 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
+import xyz.hooy.wj.executor.constant.Placeholder;
 import xyz.hooy.wj.executor.model.TaskDO;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Data
 public class ListDetailTask extends TaskDO {
@@ -32,8 +32,8 @@ public class ListDetailTask extends TaskDO {
 
 
         public String getNextPageUrl() {
-            if (StringUtils.contains(url, "${pageNum}")) {
-                return StringUtils.replace(url, "${pageNum}", String.valueOf(pageNum++));
+            if (StringUtils.contains(url, Placeholder.PAGE_NUM)) {
+                return StringUtils.replace(url, Placeholder.PAGE_NUM, String.valueOf(pageNum++));
             }
             return url;
         }
@@ -51,7 +51,7 @@ public class ListDetailTask extends TaskDO {
     @Data
     public static class ResolveDO {
 
-        private Map<String, String> constant;
+        private Map<String, String> constant = new LinkedHashMap<>();
 
         private List<TemplateDO> templates;
 
@@ -67,7 +67,7 @@ public class ListDetailTask extends TaskDO {
             @Data
             public static class ConfigDO {
 
-                private String outputFileName;
+                private String outputFileName = UUID.randomUUID().toString();
 
                 private String innerUrlAppend;
             }

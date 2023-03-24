@@ -1,0 +1,37 @@
+{
+  "crawler": {
+    "thread": 4,
+    "outputFilePath": "../../webmagic-job/out",
+    "multi": false,
+    "proxy": {
+      "hostPort": "localhost:7890",
+      "username": "admin",
+      "password": "123456"
+    }
+  },
+  "startUrl": [
+    {
+      "url": "https://top.baidu.com/board",
+      "title": "百度热搜",
+      "limit": 10
+    }
+  ],
+  "resolve": {
+    "templates": [
+      {
+        "urlRex": "https://top.baidu.com/board",
+        "config": {
+          "outputFileName": "baidu-realtime-rank.txt"
+        },
+        "process": {
+          "theme": "//div[contains(@class,'theme-hot')]/div[1]/a[1]/span/text()",
+          "items": {
+            "item": "//div[contains(@class,'theme-hot')]/div[2]/a",
+            "innerUrl": "//a/@href",
+            "title": "//div[@class='c-single-text-ellipsis']/text()[1]"
+          }
+        }
+      }
+    ]
+  }
+}
