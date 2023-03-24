@@ -21,6 +21,15 @@
 * 通过代理、分布式和多线程方式执行任务，高效采集数据；
 * 支持定时任务，采集到数据自动入库；
 
+### 使用说明
+
+1. 执行 `db/xxl_job.sql` 脚本，创建 MySQL 数据库；
+2. 拉起 **xxl-job-admin** 和 **webmagic-job-executor** （多）实例；
+3. 进入调度中心，任务管理，运行模式选择如 `BEAN`，JobHandler 选择如 `ListDetailJobHandler`；
+4. 测试 `webmagic-job-executor/src/main/resources/task-example` 路径下的配置文件。
+
+> 特别说明：未修改 xxl-job 项目任何源码，仅将其提供的数据库脚本（xxl-job.sql）中的 `executor_param` 字段改为 `text` 类型。
+
 ### 许可协议
 
 [暂无]()

@@ -1,0 +1,55 @@
+{
+  "crawler": {
+    "thread": 4,
+    "outputFilePath": "../../webmagic-job/out",
+    "multi": false,
+    "proxy": {
+      "hostPort": "localhost:7890",
+      "username": "admin",
+      "password": "123456"
+    }
+  },
+  "startUrl": [
+    {
+      "url": "https://github.com/code4craft?page=${pageNum}&tab=repositories",
+      "title": "Yihua Huang",
+      "limit": 20
+    }
+  ],
+  "resolve": {
+    "constant": {
+      "category": "Github Repositories"
+    },
+    "templates": [
+      {
+        "urlRex": "https://github\\.com/code4craft\\?page=\\d+&tab=repositories",
+        "config": {
+          "outputFileName": "code4craft-repo-rank.txt",
+          "innerUrlAppend": "https://github.com${innerUrl}"
+        },
+        "process": {
+          "items": {
+            "item": "//div[@id=\"user-repositories-list\"]/ul/li",
+            "innerUrl": "//div[1]/div[1]/h3/a/@href",
+            "name": "//div[1]/div[1]/h3/a/text()",
+            "intro": "//div[1]/div[2]/p/text()"
+          }
+        }
+      },
+      {
+        "urlRex": "https://github\\.com/code4craft/.+",
+        "config": {
+          "outputFileName": "code4craft-repo-detail.txt"
+        },
+        "process": {
+          "name": "//*[@id=\"repository-container-header\"]/div[1]/div/div/strong/a/text()",
+          "watch": "//*[@id=\"repo-notifications-counter\"]/text()",
+          "fork": "//*[@id=\"repo-network-counter\"]/text()",
+          "star": "//*[@id=\"repo-stars-counter-star\"]/text()",
+          "issues": "//*[@id=\"issues-repo-tab-count\"]/text()",
+          "pullRequest": "//*[@id=\"pull-requests-repo-tab-count\"]/text()"
+        }
+      }
+    ]
+  }
+}
