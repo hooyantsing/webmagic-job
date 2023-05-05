@@ -23,10 +23,8 @@
 
 ### 使用说明
 
-> **特别说明**
->
 > 本项目提供了爬虫执行器，调度中心需另下载 [xxl-job](https://github.com/xuxueli/xxl-job) 项目中的 `xxl-job-admin` 模块
->
+
 > 将 xxl-job 项目提供的数据库脚本（xxl-job.sql）中的 `executor_param` 字段改为 `text` 类型。本项目已提供修改好的脚本见步骤1
 
 1. 执行 `db/xxl_job.sql` 脚本，创建 MySQL 数据库；
